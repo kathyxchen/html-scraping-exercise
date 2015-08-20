@@ -29,25 +29,29 @@ def main():
 	else:
 		html = read_html(values.url)
 		print html
-
+	conn.close()
 
 def single_search(business, loc, query):
 	starting_url = BASE_URL + business + '-' + loc
 	query_page = starting_url + '?q=' + query
 	print query_page
 	num_reviews = get_num_reviews(query_page)
-	check_cache(business, loc, query, num_reviews)
-	pages = (int(num_reviews) / 40) + 1
-	stats = calculate_avg_rating(starting_url, pages, query)
-	print str(stats['total']) + ' reviews mention ' + query + ' with average rating ' + str(stats['avg'])
-
-def check_cache(business, loc, query, num_reviews):
+	check_cache(starting_url, business, loc, query, num_reviews)
+	
+def check_cache(starting_url, business, loc, query, num_reviews):
 	data = (business, loc, query, num_reviews)
-	c.execute('SELECT * FROM queries WHERE business = ? AND location = ? AND param = ? AND reviews = ?', data)
-	if c.rowcount == 0:
-		print "Empty"
+	c.execute('SELECT result FROM queries WHERE business = ? AND location = ? AND param = ? AND reviews = ?', data)
+	result = c.fetchone()
+	if result is None:
+		pages = (int(num_reviews) / 40) + 1
+		stats = calculate_avg_rating(starting_url, pages, query)
+		insert_data = (business, loc, query, num_reviews, stats['avg'])
+		c.execute('INSERT INTO queries (business, location, param, reviews, result) VALUES (?, ?, ?, ?, ?)', insert_data)
+		conn.commit()
+		print str(stats['total']) + ' reviews mention ' + query + ' with average rating ' + str(stats['avg'])
 	else: 
-		print c.fetchone()
+		print num_reviews + ' reviews mention ' + query + ' with average rating ' + str(result[0]) 
+
 	
 def read_html(url):
 	page = urllib2.urlopen(url)
